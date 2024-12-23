@@ -18,9 +18,8 @@ export class AppController {
       method: req.method,
     };
     this.logger.log(JSON.stringify(logObject, null, 2));
-    const authHeader = req.headers.Authorization;
-    if (authHeader) {
-      const token = authHeader.split(' ')[1];
+    const token = req.headers['x-access-token'];
+    if (token) {
       const decodedToken = this.tokenService.decodeToken(token);
       this.logger.log(decodedToken);
       const userId = decodedToken['sub'];
