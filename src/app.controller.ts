@@ -12,7 +12,13 @@ export class AppController {
 
   @Get()
   getHello(@Request() req): string {
-    const authHeader = req.headers.authorization;
+    const logObject = {
+      headers: req.headers,
+      url: req.url,
+      method: req.method,
+    };
+    this.logger.log(JSON.stringify(logObject, null, 2));
+    const authHeader = req.headers.Authorization;
     if (authHeader) {
       const token = authHeader.split(' ')[1];
       const decodedToken = this.tokenService.decodeToken(token);
