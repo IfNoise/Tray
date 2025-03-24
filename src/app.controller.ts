@@ -23,7 +23,7 @@ export class AppController {
       const decodedToken = this.tokenService.decodeToken(token);
       this.logger.log(decodedToken);
       const userId = decodedToken['sub'];
-      const roles = decodedToken['realm_access']['roles'];
+      const roles = decodedToken['resource_access']['oauth2-proxy']['roles'];
       return `${userId}, ${roles}`;
     }
     return 'Authorization header missing';

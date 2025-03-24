@@ -1,0 +1,15 @@
+type Tray {
+  userId: String!
+  plants: [String]!
+}
+input AddPlantInput {
+  plants: [String]!
+}
+type Query {
+  tray: [Tray]!
+}
+
+type Mutation {
+  addPlant( addPlant: AddPlantInput!): Tray!
+  cleanTray: Tray
+}
