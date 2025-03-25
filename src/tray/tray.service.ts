@@ -1,33 +1,74 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AddPlantInput } from './dto/add-plants.input';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { TrayDocument, TrayModel } from './schemas/tray.schema';
 
 @Injectable()
 export class TrayService {
-  // Для примера используем in-memory хранилище, в реальном приложении здесь будет БД
-  private trays: Map<string, { userId: string; plants: string[] }> = new Map();
+  private readonly logger = new Logger(TrayService.name);
 
-  findAll(userId: string) {
-    const userTray = this.trays.get(userId);
-    return userTray ? [userTray] : [];
+  constructor(
+    @InjectModel(TrayModel.name) private trayModel: Model<TrayDocument>,
+  ) {}
+
+  async findAll(userId: string) {
+    try {
+      const userTray = await this.trayModel.find({ userId }).exec();
+      return userTray;
+    } catch (error) {
+      this.logger.error(`Error finding trays for user ${userId}:`, error);
+      throw error;
+    }
   }
 
-  addPlant(userId: string, addPlantInput: AddPlantInput) {
-    let userTray = this.trays.get(userId);
+  async addPlant(userId: string, addPlantInput: AddPlantInput) {
+    try {
+      // Находим существующий поднос или создаем новый
+      let userTray = await this.trayModel.findOne({ userId }).exec();
 
-    if (!userTray) {
-      userTray = { userId, plants: [] };
-      this.trays.set(userId, userTray);
+      if (!userTray) {
+        userTray = new this.trayModel({ userId, plants: [] });
+      }
+      if (!userTray) {
+        throw new Error('User tray not found');
+      }
+
+      // Фильтруем новые растения
+      const newPlants = Array.isArray(addPlantInput.plants)
+        ? addPlantInput.plants.filter(
+            (plant) => !userTray.plants.includes(plant),
+          )
+        : [];
+
+      // Добавляем новые растения
+      if (newPlants.length > 0) {
+        userTray.plants.push(...newPlants);
+        await userTray.save();
+      }
+
+      return userTray;
+    } catch (error) {
+      this.logger.error(`Error adding plants for user ${userId}:`, error);
+      throw error;
     }
-
-    userTray.plants = [...userTray.plants, ...addPlantInput.plants];
-    return userTray;
   }
 
-  cleanTray(userId: string) {
-    const userTray = this.trays.get(userId);
-    if (userTray) {
-      userTray.plants = [];
+  async cleanTray(userId: string) {
+    try {
+      const userTray = await this.trayModel.findOne({ userId }).exec();
+
+      if (userTray) {
+        userTray.plants = [];
+        return await userTray.save();
+      }
+
+      // Если подноса нет, создаем пустой
+      // const newTray = new this.trayModel({ userId, plants: [] });
+      return null;
+    } catch (error) {
+      this.logger.error(`Error cleaning tray for user ${userId}:`, error);
+      throw error;
     }
-    return userTray || { userId, plants: [] };
   }
 }
