@@ -4,15 +4,11 @@ type Tray {
   plants: [String!]!
 }
 
-input AddPlantInput {
-  plants: [String!]!
-}
-
 type Query {
   tray: [Tray]
 }
 
 type Mutation {
-  addPlant(addPlant: AddPlantInput!): Tray
+  addPlant(plants: [String!]!): Tray
   cleanTray: Tray
 }

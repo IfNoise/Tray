@@ -14,7 +14,11 @@ export class TrayService {
 
   async findAll(userId: string) {
     try {
-      const userTray = await this.trayModel.find({ userId }).exec();
+      let userTray = await this.trayModel.find({ userId }).exec();
+      if (userTray.length === 0) {
+        const newTray = await new this.trayModel({ userId, plants: [] }).save();
+        userTray = [newTray];
+      }
       return userTray;
     } catch (error) {
       this.logger.error(`Error finding trays for user ${userId}:`, error);

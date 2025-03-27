@@ -15,20 +15,20 @@ export class TrayResolver {
     if (!userId) {
       throw new UnauthorizedException('Authorization required');
     }
-
     return this.trayService.findAll(userId);
   }
 
   @Mutation('addPlant')
   async addPlant(
-    @Args('addPlant') addPlantInput: AddPlantInput, // Изменено с 'plants' на 'addPlant'
+    @Args('plants') plants: string[], // Изменено с 'addPlant' на 'plants'
     @CurrentUserId() userId: string,
   ) {
     if (!userId) {
-      throw new UnauthorizedException(`Authorization required ${userId}`);
+      throw new UnauthorizedException('Authorization required');
     }
 
-    return this.trayService.addPlant(userId, addPlantInput);
+    // Адаптируем вызов сервиса, чтобы он принимал массив строк
+    return this.trayService.addPlant(userId, { plants });
   }
 
   @Mutation('cleanTray')

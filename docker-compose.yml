@@ -1,0 +1,132 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: tray-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/mongo_root_username
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_root_password
+      MONGO_INITDB_DATABASE: tray
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - tray-network
+    ports:
+      - "127.0.0.1:27017:27017"  # Привязка только к localhost
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    user: mongodb:mongodb
+    secrets:
+      - mongo_root_username
+      - mongo_root_password
+      - mongo_user_username
+      - mongo_user_password
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: tray-mongo-express
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME_FILE: /run/secrets/mongo_root_username
+      ME_CONFIG_MONGODB_ADMINPASSWORD_FILE: /run/secrets/mongo_root_password
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME_FILE: /run/secrets/express_admin_username
+      ME_CONFIG_BASICAUTH_PASSWORD_FILE: /run/secrets/express_admin_password
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      - tray-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    secrets:
+      - mongo_root_username
+      - mongo_root_password
+      - express_admin_username
+      - express_admin_password
+
+  tray-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tray-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/tray?authSource=admin
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - TZ=UTC
+      - PORT=3080
+    ports:
+      - "127.0.0.1:3080:3080"
+    networks:
+      - tray-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    secrets:
+      - mongo_user_username
+      - mongo_user_password
+      - jwt_secret
+
+networks:
+  tray-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.28.0.0/16"
+          gateway: "172.28.0.1"
+    driver_opts:
+      com.docker.network.bridge.name: tray-net
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+volumes:
+  mongodb_data:
+    driver: local
+
+secrets:
+  mongo_root_username:
+    file: ./secrets/mongo_root_username.txt
+  mongo_root_password:
+    file: ./secrets/mongo_root_password.txt
+  mongo_user_username:
+    file: ./secrets/mongo_user_username.txt
+  mongo_user_password:
+    file: ./secrets/mongo_user_password.txt
+  express_admin_username:
+    file: ./secrets/express_admin_username.txt
+  express_admin_password:
+    file: ./secrets/express_admin_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt

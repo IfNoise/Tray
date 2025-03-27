@@ -17,18 +17,34 @@ export class GraphqlAuthGuard implements CanActivate {
     const token = req.headers['x-access-token'];
 
     if (!token) {
-      throw new UnauthorizedException('Authorization required');
+      throw new UnauthorizedException('Missing authentication token');
     }
 
     try {
       const decodedToken = this.tokenService.decodeToken(token);
-      req.userId = decodedToken['sub'];
-      req.roles =
-        decodedToken['resource_access']['oauth2-proxy']['roles'] || [];
+      // Проверка наличия sub в токене
+      if (!decodedToken || !decodedToken.sub) {
+        throw new UnauthorizedException('Invalid token structure');
+      }
+
+      // Добавляем данные пользователя в запрос
+      req.userId = decodedToken.sub;
+
+      // Проверка наличия ролей (если они нужны)
+      if (
+        decodedToken.resource_access &&
+        decodedToken.resource_access['oauth2-proxy'] &&
+        decodedToken.resource_access['oauth2-proxy'].roles
+      ) {
+        req.roles = decodedToken.resource_access['oauth2-proxy'].roles;
+      } else {
+        req.roles = [];
+      }
+
       return true;
     } catch (error) {
       console.error('Invalid token', error);
-      return false; // или true, если хотите разрешить доступ
+      throw new UnauthorizedException('Invalid authentication token');
     }
   }
 }
